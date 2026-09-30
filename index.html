@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="bn"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Calculator</title>
+<style>
+:root{--bg:#f2f3f7;--panel:#fff;--txt:#14171f;--sub:#7b8194;--key:#fff;--op:#e6e9f2;--acc1:#ffb300;--acc2:#ff5a00;--line:#dfe2ea}
+:root[data-t="dark"]{--bg:#0b0e16;--panel:#171b28;--txt:#f4f5f9;--sub:#8b93a8;--key:#222738;--op:#2d3350;--line:#2a3045}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent;user-select:none}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--txt);font-family:system-ui,sans-serif;overflow:hidden}
+#app{height:100%;display:flex;flex-direction:column;padding:8px 14px 14px}
+.bar{display:flex;justify-content:space-between;align-items:center;height:48px}
+.bar b{font-size:18px}
+.ib{background:none;border:0;color:var(--txt);font-size:15px;padding:8px 10px;border-radius:10px}
+.ib:active{background:var(--op)}
+#disp{flex:1;background:var(--panel);border-radius:22px;padding:16px 20px;display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-end;margin-bottom:14px;overflow:hidden;box-shadow:0 2px 10px #0002}
+#expr{color:var(--sub);font-size:24px;min-height:30px;word-break:break-all;text-align:right}
+#res{font-size:54px;font-weight:600;font-family:ui-monospace,monospace;max-width:100%;white-space:nowrap;overflow:hidden}
+#pad{display:grid;grid-template-columns:repeat(4,1fr);gap:11px;height:56%}
+#pad button{border:0;border-radius:20px;background:var(--key);color:var(--txt);font-size:28px;box-shadow:0 2px 6px #0003}
+#pad button:active{transform:scale(.94)}
+#pad .op{background:var(--op);color:var(--acc2);font-weight:600}
+#pad .eq{background:linear-gradient(160deg,var(--acc1),var(--acc2));color:#fff}
+.sheet{position:fixed;inset:0;background:var(--bg);display:none;flex-direction:column;padding:8px 14px}
+.sheet.on{display:flex}
+.list{flex:1;overflow:auto}
+.item{background:var(--panel);border-radius:14px;padding:12px 16px;margin-bottom:10px;text-align:right}
+.item small{color:var(--sub);display:block;font-size:15px}.item span{font-size:24px;font-weight:600}
+.empty{color:var(--sub);text-align:center;margin-top:60px}
+.row{background:var(--panel);border-radius:14px;padding:14px 16px;margin-bottom:10px}
+.opts{display:flex;gap:8px;margin-top:10px}
+.opts button{flex:1;padding:12px 0;border-radius:12px;border:2px solid var(--line);background:none;color:var(--txt);font-size:15px}
+.opts button.sel{border-color:var(--acc2);color:var(--acc2);font-weight:600}
+</style></head><body>
+<div id="app">
+ <div class="bar"><b>Calculator</b><div><button class="ib" onclick="openS('hist')">🕘 History</button><button class="ib" onclick="openS('set')">⚙ Settings</button></div></div>
+ <div id="disp"><div id="expr"></div><div id="res">0</div></div>
+ <div id="pad"></div>
+</div>
+<div class="sheet" id="hist"><div class="bar"><button class="ib" onclick="closeS()">← Back</button><b>History</b><button class="ib" onclick="clearH()">🗑 Clear</button></div><div class="list" id="hl"></div></div>
+<div class="sheet" id="set"><div class="bar"><button class="ib" onclick="closeS()">← Back</button><b>Settings</b><span style="width:60px"></span></div>
+ <div class="row">Theme (থিম)<div class="opts" id="to">
+  <button data-v="light" onclick="setTheme('light')">☀ Light</button>
+  <button data-v="dark" onclick="setTheme('dark')">🌙 Dark</button>
+  <button data-v="system" onclick="setTheme('system')">📱 System</button></div></div></div>
+<script>
+const st={get(k){try{return window.Android?Android.load(k):localStorage.getItem(k)||""}catch(e){return ""}},
+ set(k,v){try{window.Android?Android.save(k,v):localStorage.setItem(k,v)}catch(e){}}};
+let expr="",justEq=false,hist=[];
+try{hist=JSON.parse(st.get("hist")||"[]")}catch(e){}
+const keys=[["C","op"],["⌫","op"],["%","op"],["÷","op"],["7"],["8"],["9"],["×","op"],["4"],["5"],["6"],["−","op"],["1"],["2"],["3"],["+","op"],["0"],["00"],["."],["=","eq"]];
+const pad=document.getElementById("pad");
+keys.forEach(([k,c])=>{const b=document.createElement("button");b.textContent=k;if(c)b.className=c;b.onclick=()=>press(k);pad.appendChild(b)});
+const isOp=c=>"+−×÷".includes(c);
+function press(k){
+ if(k=="C"){expr="";justEq=false}
+ else if(k=="⌫"){expr=expr.slice(0,-1)}
+ else if(k=="="){equals();return}
+ else{
+  if(justEq&&!isOp(k)&&k!="%")expr="";
+  justEq=false;
+  if(isOp(k)){if(!expr){if(k=="−")expr="−";render();return}
+   if(isOp(expr.slice(-1)))expr=expr.slice(0,-1);}
+  if(k=="."){const n=expr.split(/[+−×÷]/).pop();if(n.includes("."))return}
+  expr+=k}
+ render()}
+function calc(e){
+ const s=e.replace(/×/g,"*").replace(/÷/g,"/").replace(/−/g,"-").replace(/%/g,"/100");
+ if(!/^[0-9+\-*/.()\s]+$/.test(s))throw 0;
+ const v=Function('"use strict";return ('+s+')')();
+ if(!isFinite(v))throw 0;
+ return String(parseFloat(v.toPrecision(12)))}
+function render(){
+ document.getElementById("expr").textContent=justEq?document.getElementById("expr").textContent:expr;
+ let r="0";
+ if(expr){try{let e=expr;while(e&&isOp(e.slice(-1)))e=e.slice(0,-1);r=e?calc(e):"0"}catch(x){r=expr.slice(-12)}}
+ if(justEq)r=expr;
+ const el=document.getElementById("res");el.textContent=r;
+ el.style.fontSize=r.length>12?"32px":r.length>9?"42px":"54px"}
+function equals(){
+ if(!expr)return;
+ let e=expr;while(e&&isOp(e.slice(-1)))e=e.slice(0,-1);
+ try{const r=calc(e);
+  hist.unshift({e:e,r:r,t:Date.now()});hist=hist.slice(0,200);st.set("hist",JSON.stringify(hist));
+  document.getElementById("expr").textContent=e+" =";expr=r;justEq=true;render()}
+ catch(x){document.getElementById("res").textContent="Error";expr="";justEq=false}}
+function showH(){const l=document.getElementById("hl");l.innerHTML="";
+ if(!hist.length){l.innerHTML='<div class="empty">কোনো history নেই</div>';return}
+ hist.forEach(h=>{const d=document.createElement("div");d.className="item";
+  d.innerHTML="<small>"+h.e+" =</small><span>"+h.r+"</span>";
+  d.onclick=()=>{expr=h.r;justEq=false;document.getElementById("expr").textContent="";render();closeS()};l.appendChild(d)})}
+function clearH(){hist=[];st.set("hist","[]");showH()}
+function openS(id){if(id=="hist")showH();document.getElementById(id).classList.add("on")}
+function closeS(){document.querySelectorAll(".sheet").forEach(s=>s.classList.remove("on"))}
+function handleBack(){if(document.querySelector(".sheet.on")){closeS();return true}return false}
+let theme=st.get("theme")||"system";
+function applyTheme(){
+ const d=theme=="dark"||(theme=="system"&&matchMedia("(prefers-color-scheme:dark)").matches);
+ document.documentElement.dataset.t=d?"dark":"light";
+ document.querySelectorAll("#to button").forEach(b=>b.classList.toggle("sel",b.dataset.v==theme));
+ try{Android.statusBar(d?"#0b0e16":"#f2f3f7")}catch(e){}}
+function setTheme(t){theme=t;st.set("theme",t);applyTheme()}
+applyTheme();render();
+</script></body></html>
